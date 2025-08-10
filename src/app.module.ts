@@ -2,10 +2,13 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
+import { StudentsModule } from './students/students.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseSeederService } from './database/database-seeder.service';
 import { User } from './users/entities/user.entity';
+import { Student } from './students/entities/student.entity';
+import { Promotion } from './students/entities/promotion.entity';
 
 @Module({
   imports: [
@@ -25,6 +28,7 @@ import { User } from './users/entities/user.entity';
     }),
     TypeOrmModule.forFeature([User]),
     UsersModule,
+    StudentsModule,
   ],
   controllers: [AppController],
   providers: [AppService, DatabaseSeederService],
