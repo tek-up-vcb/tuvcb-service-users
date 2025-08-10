@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEmail, Length, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, Length, IsUUID, IsArray, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateStudentDto {
@@ -44,10 +44,13 @@ export class CreateStudentDto {
   email: string;
 
   @ApiProperty({ 
-    description: 'ID de la promotion',
-    example: '123e4567-e89b-12d3-a456-426614174000'
+    description: 'IDs des promotions',
+    example: ['123e4567-e89b-12d3-a456-426614174000'],
+    type: [String],
+    required: false
   })
-  @IsUUID()
-  @IsNotEmpty()
-  promotionId: string;
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  promotionIds?: string[];
 }

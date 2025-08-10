@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToMany } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Student } from './student.entity';
 
@@ -32,6 +32,6 @@ export class Promotion {
   @UpdateDateColumn()
   dateModification: Date;
 
-  @OneToMany(() => Student, student => student.promotion)
+  @ManyToMany(() => Student, student => student.promotions)
   students: Student[];
 }

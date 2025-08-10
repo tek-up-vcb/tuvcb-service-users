@@ -99,4 +99,14 @@ export class StudentsController {
     await this.studentsService.remove(id);
     return { message: 'Étudiant supprimé avec succès' };
   }
+
+  @Patch('bulk/promotions')
+  @ApiOperation({ summary: 'Mettre à jour les promotions de plusieurs étudiants' })
+  @ApiResponse({ status: 200, description: 'Promotions mises à jour avec succès', type: [Student] })
+  @ApiResponse({ status: 404, description: 'Un ou plusieurs étudiants/promotions non trouvés' })
+  async bulkUpdatePromotions(
+    @Body() body: { studentIds: string[]; promotionIds: string[] }
+  ): Promise<Student[]> {
+    return this.studentsService.bulkUpdatePromotions(body.studentIds, body.promotionIds);
+  }
 }

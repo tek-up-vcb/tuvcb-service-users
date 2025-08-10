@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Student } from './entities/student.entity';
 import { Promotion } from './entities/promotion.entity';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -34,44 +34,59 @@ export class StudentsService {
       throw new ConflictException('Un étudiant avec cet email existe déjà');
     }
 
-    // Vérifier que la promotion existe
-    const promotion = await this.promotionRepository.findOne({
-      where: { id: createStudentDto.promotionId }
+    // Créer l'étudiant
+    const student = this.studentRepository.create({
+      studentId: createStudentDto.studentId,
+      nom: createStudentDto.nom,
+      prenom: createStudentDto.prenom,
+      email: createStudentDto.email
     });
 
-    if (!promotion) {
-      throw new NotFoundException('Promotion non trouvée');
-    }
-
-    const student = this.studentRepository.create(createStudentDto);
     const savedStudent = await this.studentRepository.save(student);
+
+    // Gérer les promotions si spécifiées
+    if (createStudentDto.promotionIds && createStudentDto.promotionIds.length > 0) {
+      // Vérifier que toutes les promotions existent
+      const promotions = await this.promotionRepository.find({
+        where: { id: In(createStudentDto.promotionIds) }
+      });
+      
+      if (promotions.length !== createStudentDto.promotionIds.length) {
+        throw new NotFoundException('Une ou plusieurs promotions non trouvées');
+      }
+
+      savedStudent.promotions = promotions;
+      await this.studentRepository.save(savedStudent);
+    }
     
-    // Recharger l'étudiant avec sa promotion
+    // Recharger l'étudiant avec ses promotions
     return await this.studentRepository.findOne({
       where: { id: savedStudent.id },
-      relations: ['promotion']
+      relations: ['promotions']
     });
   }
 
   async findAll(): Promise<Student[]> {
     return await this.studentRepository.find({
-      relations: ['promotion'],
+      relations: ['promotions'],
       order: { nom: 'ASC', prenom: 'ASC' }
     });
   }
 
   async findByPromotion(promotionId: string): Promise<Student[]> {
-    return await this.studentRepository.find({
-      where: { promotionId },
-      relations: ['promotion'],
-      order: { nom: 'ASC', prenom: 'ASC' }
-    });
+    return await this.studentRepository
+      .createQueryBuilder('student')
+      .leftJoinAndSelect('student.promotions', 'promotion')
+      .where('promotion.id = :promotionId', { promotionId })
+      .orderBy('student.nom', 'ASC')
+      .addOrderBy('student.prenom', 'ASC')
+      .getMany();
   }
 
   async findOne(id: string): Promise<Student> {
     const student = await this.studentRepository.findOne({
       where: { id },
-      relations: ['promotion']
+      relations: ['promotions']
     });
 
     if (!student) {
@@ -84,7 +99,7 @@ export class StudentsService {
   async findByStudentId(studentId: string): Promise<Student> {
     const student = await this.studentRepository.findOne({
       where: { studentId },
-      relations: ['promotion']
+      relations: ['promotions']
     });
 
     if (!student) {
@@ -97,7 +112,7 @@ export class StudentsService {
   async findByEmail(email: string): Promise<Student> {
     const student = await this.studentRepository.findOne({
       where: { email },
-      relations: ['promotion']
+      relations: ['promotions']
     });
 
     if (!student) {
@@ -132,24 +147,37 @@ export class StudentsService {
       }
     }
 
-    // Vérifier que la promotion existe si elle est modifiée
-    if (updateStudentDto.promotionId && updateStudentDto.promotionId !== student.promotionId) {
-      const promotion = await this.promotionRepository.findOne({
-        where: { id: updateStudentDto.promotionId }
-      });
+    // Gérer les promotions si spécifiées
+    if (updateStudentDto.promotionIds !== undefined) {
+      if (updateStudentDto.promotionIds.length > 0) {
+        // Vérifier que toutes les promotions existent
+        const promotions = await this.promotionRepository.find({
+          where: { id: In(updateStudentDto.promotionIds) }
+        });
+        
+        if (promotions.length !== updateStudentDto.promotionIds.length) {
+          throw new NotFoundException('Une ou plusieurs promotions non trouvées');
+        }
 
-      if (!promotion) {
-        throw new NotFoundException('Promotion non trouvée');
+        student.promotions = promotions;
+      } else {
+        // Supprimer toutes les promotions
+        student.promotions = [];
       }
     }
 
-    Object.assign(student, updateStudentDto);
+    // Mettre à jour les autres champs
+    if (updateStudentDto.studentId) student.studentId = updateStudentDto.studentId;
+    if (updateStudentDto.nom) student.nom = updateStudentDto.nom;
+    if (updateStudentDto.prenom) student.prenom = updateStudentDto.prenom;
+    if (updateStudentDto.email) student.email = updateStudentDto.email;
+
     const savedStudent = await this.studentRepository.save(student);
     
-    // Recharger l'étudiant avec sa promotion
+    // Recharger l'étudiant avec ses promotions
     return await this.studentRepository.findOne({
       where: { id: savedStudent.id },
-      relations: ['promotion']
+      relations: ['promotions']
     });
   }
 
@@ -163,8 +191,43 @@ export class StudentsService {
   }
 
   async countByPromotion(promotionId: string): Promise<number> {
-    return await this.studentRepository.count({
-      where: { promotionId }
+    return await this.studentRepository
+      .createQueryBuilder('student')
+      .leftJoin('student.promotions', 'promotion')
+      .where('promotion.id = :promotionId', { promotionId })
+      .getCount();
+  }
+
+  async bulkUpdatePromotions(studentIds: string[], promotionIds: string[]): Promise<Student[]> {
+    // Vérifier que tous les étudiants existent
+    const students = await this.studentRepository.find({
+      where: { id: In(studentIds) },
+      relations: ['promotions']
+    });
+
+    if (students.length !== studentIds.length) {
+      throw new NotFoundException('Un ou plusieurs étudiants non trouvés');
+    }
+
+    // Vérifier que toutes les promotions existent
+    const promotions = await this.promotionRepository.find({
+      where: { id: In(promotionIds) }
+    });
+    
+    if (promotions.length !== promotionIds.length) {
+      throw new NotFoundException('Une ou plusieurs promotions non trouvées');
+    }
+
+    // Mettre à jour les promotions pour chaque étudiant
+    for (const student of students) {
+      student.promotions = promotions;
+      await this.studentRepository.save(student);
+    }
+
+    // Retourner les étudiants mis à jour avec leurs promotions
+    return await this.studentRepository.find({
+      where: { id: In(studentIds) },
+      relations: ['promotions']
     });
   }
 }

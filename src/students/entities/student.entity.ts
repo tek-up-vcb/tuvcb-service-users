@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToMany, JoinTable } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Promotion } from './promotion.entity';
 
@@ -24,14 +24,14 @@ export class Student {
   @Column({ unique: true, length: 255 })
   email: string;
 
-  @ApiProperty({ description: 'Promotion de l\'étudiant' })
-  @ManyToOne(() => Promotion, promotion => promotion.students, { eager: true })
-  @JoinColumn({ name: 'promotionId' })
-  promotion: Promotion;
-
-  @ApiProperty({ description: 'ID de la promotion' })
-  @Column({ nullable: false })
-  promotionId: string;
+  @ApiProperty({ description: 'Promotions de l\'étudiant' })
+  @ManyToMany(() => Promotion, promotion => promotion.students, { eager: true })
+  @JoinTable({
+    name: 'student_promotions',
+    joinColumn: { name: 'studentId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'promotionId', referencedColumnName: 'id' }
+  })
+  promotions: Promotion[];
 
   @ApiProperty({ description: 'Indique si l\'étudiant est actif' })
   @Column({ default: true })
