@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { DatabaseSeederService } from './database/database-seeder.service';
+import { User } from './users/entities/user.entity';
 
 @Module({
   imports: [
@@ -21,9 +23,10 @@ import { AppService } from './app.service';
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
     }),
+    TypeOrmModule.forFeature([User]),
     UsersModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, DatabaseSeederService],
 })
 export class AppModule {}
