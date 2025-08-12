@@ -21,7 +21,7 @@ import { Promotion } from './students/entities/promotion.entity';
       port: parseInt(process.env.DB_PORT) || 5432,
       username: process.env.DB_USERNAME || 'tuvcb_user',
       password: process.env.DB_PASSWORD || 'tuvcb_password',
-      database: process.env.DB_DATABASE || 'tuvcb_users',
+      database: process.env.DB_DATABASE || 'tuvcb_main',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
