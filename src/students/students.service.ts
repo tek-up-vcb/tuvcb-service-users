@@ -5,6 +5,7 @@ import { Student } from './entities/student.entity';
 import { Promotion } from './entities/promotion.entity';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
+import { MetricsService } from '../metrics/metrics.service';
 
 @Injectable()
 export class StudentsService {
@@ -13,6 +14,7 @@ export class StudentsService {
     private studentRepository: Repository<Student>,
     @InjectRepository(Promotion)
     private promotionRepository: Repository<Promotion>,
+    private metricsService: MetricsService,
   ) {}
 
   async create(createStudentDto: CreateStudentDto): Promise<Student> {
@@ -60,10 +62,15 @@ export class StudentsService {
     }
     
     // Recharger l'étudiant avec ses promotions
-    return await this.studentRepository.findOne({
+    const result = await this.studentRepository.findOne({
       where: { id: savedStudent.id },
       relations: ['promotions']
     });
+    
+    // Mettre à jour les métriques
+    await this.updateStudentCountMetrics();
+    
+    return result;
   }
 
   async findAll(): Promise<Student[]> {
@@ -229,5 +236,20 @@ export class StudentsService {
       where: { id: In(studentIds) },
       relations: ['promotions']
     });
+  }
+
+  // Méthode publique pour initialiser les métriques
+  async initializeMetrics(): Promise<void> {
+    await this.updateStudentCountMetrics();
+  }
+
+  // Méthode privée pour mettre à jour les métriques de comptage des étudiants
+  private async updateStudentCountMetrics(): Promise<void> {
+    try {
+      const totalStudents = await this.studentRepository.count();
+      this.metricsService.setTotalStudents(totalStudents);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des métriques étudiants:', error);
+    }
   }
 }

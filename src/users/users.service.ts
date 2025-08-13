@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { MetricsService } from '../metrics/metrics.service';
 import { isAddress } from 'ethers';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    private metricsService: MetricsService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -34,7 +36,12 @@ export class UsersService {
       walletAddress: createUserDto.walletAddress.toLowerCase(),
     });
 
-    return this.usersRepository.save(user);
+    const savedUser = await this.usersRepository.save(user);
+    
+    // Mettre à jour les métriques
+    await this.updateUserCountMetrics();
+    
+    return savedUser;
   }
 
   async findAll(): Promise<User[]> {
@@ -88,6 +95,9 @@ export class UsersService {
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user);
+    
+    // Mettre à jour les métriques
+    await this.updateUserCountMetrics();
   }
 
   async count(): Promise<number> {
@@ -99,5 +109,20 @@ export class UsersService {
       where: { role: role as any },
       order: { dateCreation: 'DESC' },
     });
+  }
+
+  // Méthode publique pour initialiser les métriques
+  async initializeMetrics(): Promise<void> {
+    await this.updateUserCountMetrics();
+  }
+
+  // Méthode privée pour mettre à jour les métriques de comptage
+  private async updateUserCountMetrics(): Promise<void> {
+    try {
+      const totalUsers = await this.usersRepository.count();
+      this.metricsService.setTotalUsers(totalUsers);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des métriques:', error);
+    }
   }
 }

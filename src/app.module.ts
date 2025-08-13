@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { UsersModule } from './users/users.module';
 import { StudentsModule } from './students/students.module';
+import { MetricsModule } from './metrics/metrics.module';
+import { MetricsInterceptor } from './metrics/metrics.interceptor';
+import { MetricsInitService } from './app/metrics-init.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseSeederService } from './database/database-seeder.service';
@@ -27,10 +31,19 @@ import { Promotion } from './students/entities/promotion.entity';
       logging: process.env.NODE_ENV === 'development',
     }),
     TypeOrmModule.forFeature([User]),
+    MetricsModule, // En premier pour éviter les dépendances circulaires
     UsersModule,
     StudentsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, DatabaseSeederService],
+  providers: [
+    AppService, 
+    DatabaseSeederService,
+    MetricsInitService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
+  ],
 })
 export class AppModule {}
