@@ -17,6 +17,12 @@ export class StudentsService {
     private metricsService: MetricsService,
   ) {}
 
+  // --- Cache KPI ---
+  private kpiCache: { data: any; ts: number } | null = null;
+  private readonly KPI_TTL_MS = 60_000;
+  private isFresh(entry: { ts: number } | null) { return !!entry && (Date.now() - entry.ts) < this.KPI_TTL_MS; }
+  private invalidateKpi() { this.kpiCache = null; }
+
   async create(createStudentDto: CreateStudentDto): Promise<Student> {
     // Vérifier si un étudiant avec cet ID existe déjà
     const existingStudentById = await this.studentRepository.findOne({
@@ -69,6 +75,7 @@ export class StudentsService {
     
     // Mettre à jour les métriques
     await this.updateStudentCountMetrics();
+  this.invalidateKpi();
     
     return result;
   }
@@ -180,6 +187,7 @@ export class StudentsService {
     if (updateStudentDto.email) student.email = updateStudentDto.email;
 
     const savedStudent = await this.studentRepository.save(student);
+  this.invalidateKpi();
     
     // Recharger l'étudiant avec ses promotions
     return await this.studentRepository.findOne({
@@ -191,6 +199,7 @@ export class StudentsService {
   async remove(id: string): Promise<void> {
     const student = await this.findOne(id);
     await this.studentRepository.remove(student);
+  this.invalidateKpi();
   }
 
   async count(): Promise<number> {
@@ -203,6 +212,18 @@ export class StudentsService {
       .leftJoin('student.promotions', 'promotion')
       .where('promotion.id = :promotionId', { promotionId })
       .getCount();
+  }
+
+  /**
+   * KPIs étudiants basiques
+   */
+  async getKpi() {
+  if (this.isFresh(this.kpiCache)) return this.kpiCache.data;
+  const total = await this.studentRepository.count();
+  const active = await this.studentRepository.count({ where: { isActive: true } });
+  const data = { total, active };
+  this.kpiCache = { data, ts: Date.now() };
+  return data;
   }
 
   async bulkUpdatePromotions(studentIds: string[], promotionIds: string[]): Promise<Student[]> {

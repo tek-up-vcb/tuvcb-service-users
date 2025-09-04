@@ -15,6 +15,12 @@ export class UsersService {
     private metricsService: MetricsService,
   ) {}
 
+  // --- Cache léger KPI ---
+  private kpiCache: { data: any; ts: number } | null = null;
+  private readonly KPI_TTL_MS = 60_000;
+  private isFresh(entry: { ts: number } | null) { return !!entry && (Date.now() - entry.ts) < this.KPI_TTL_MS; }
+  private invalidateKpi() { this.kpiCache = null; }
+
   async create(createUserDto: CreateUserDto): Promise<User> {
     // Validation de l'adresse Ethereum
     if (!isAddress(createUserDto.walletAddress)) {
@@ -40,6 +46,7 @@ export class UsersService {
     
     // Mettre à jour les métriques
     await this.updateUserCountMetrics();
+  this.invalidateKpi();
     
     return savedUser;
   }
@@ -89,7 +96,9 @@ export class UsersService {
     }
 
     Object.assign(user, updateUserDto);
-    return this.usersRepository.save(user);
+  const saved = await this.usersRepository.save(user);
+  this.invalidateKpi();
+  return saved;
   }
 
   async remove(id: string): Promise<void> {
@@ -98,6 +107,7 @@ export class UsersService {
     
     // Mettre à jour les métriques
     await this.updateUserCountMetrics();
+  this.invalidateKpi();
   }
 
   async count(): Promise<number> {
@@ -109,6 +119,23 @@ export class UsersService {
       where: { role: role as any },
       order: { dateCreation: 'DESC' },
     });
+  }
+
+  /**
+   * KPI utilisateurs : total, actifs, par rôle
+   */
+  async getKpi() {
+    if (this.isFresh(this.kpiCache)) return this.kpiCache.data;
+    const [total, active, admins, teachers, guests] = await Promise.all([
+      this.usersRepository.count(),
+      this.usersRepository.count({ where: { isActive: true } }),
+      this.usersRepository.count({ where: { role: 'Admin' as any } }),
+      this.usersRepository.count({ where: { role: 'Teacher' as any } }),
+      this.usersRepository.count({ where: { role: 'Guest' as any } }),
+    ]);
+    const data = { total, active, admins, teachers, guests };
+    this.kpiCache = { data, ts: Date.now() };
+    return data;
   }
 
   // Méthode publique pour initialiser les métriques

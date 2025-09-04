@@ -51,6 +51,13 @@ export class UsersController {
     return this.usersService.findByWalletAddress(address);
   }
 
+  @Get('kpi')
+  @ApiOperation({ summary: 'KPIs utilisateurs' })
+  @ApiResponse({ status: 200, description: 'KPIs retournés' })
+  getKpi() {
+    return this.usersService.getKpi();
+  }
+
   @Get()
   @ApiOperation({ summary: 'Récupérer tous les utilisateurs' })
   @ApiQuery({ name: 'role', required: false, enum: UserRole, description: 'Filtrer par rôle' })

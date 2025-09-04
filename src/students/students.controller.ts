@@ -42,6 +42,13 @@ export class StudentsController {
     return { count };
   }
 
+  @Get('kpi')
+  @ApiOperation({ summary: 'KPIs étudiants' })
+  @ApiResponse({ status: 200, description: 'KPIs retournés' })
+  getKpi() {
+    return this.studentsService.getKpi();
+  }
+
   @Get('student-id/:studentId')
   @ApiOperation({ summary: 'Trouver un étudiant par son ID étudiant' })
   @ApiParam({ name: 'studentId', description: 'ID étudiant' })
