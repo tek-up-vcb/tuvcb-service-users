@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { UsersModule } from './users/users.module';
+import { UserModule } from './users/users.module';
 import { StudentsModule } from './students/students.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { MetricsInterceptor } from './metrics/metrics.interceptor';
@@ -13,6 +13,7 @@ import { DatabaseSeederService } from './database/database-seeder.service';
 import { User } from './users/entities/user.entity';
 import { Student } from './students/entities/student.entity';
 import { Promotion } from './students/entities/promotion.entity';
+import { BacklogModule } from './backlog/backlog.module';
 
 @Module({
   imports: [
@@ -32,8 +33,9 @@ import { Promotion } from './students/entities/promotion.entity';
     }),
     TypeOrmModule.forFeature([User]),
     MetricsModule, // En premier pour éviter les dépendances circulaires
-    UsersModule,
+    UserModule,
     StudentsModule,
+    BacklogModule,
   ],
   controllers: [AppController],
   providers: [
