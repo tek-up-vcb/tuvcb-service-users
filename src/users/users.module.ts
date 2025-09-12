@@ -19,21 +19,17 @@ import { BacklogMiddleware } from '../backlog/backlog.middleware';
 })
 
 
+// src/users/users.module.ts
 export class UserModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(BacklogMiddleware)
       .forRoutes(
-        // POST /users
-        { path: 'users', method: RequestMethod.POST },
-        // PATCH /users/:id
-        { path: 'users/:id', method: RequestMethod.PATCH },
-        // PUT /users/:id
-        { path: 'users/:id', method: RequestMethod.PUT },
-        // DELETE /users/:id
-        { path: 'users/:id', method: RequestMethod.DELETE },
-        // POST /users/:id/roles (exemple changement de rôle)
-        { path: 'users/:id/roles', method: RequestMethod.POST },
+        { path: 'api/users', method: RequestMethod.POST },
+        { path: 'api/users/:id', method: RequestMethod.PATCH },
+        { path: 'api/users/:id', method: RequestMethod.PUT },
+        { path: 'api/users/:id', method: RequestMethod.DELETE },
+        { path: 'api/users/:id/roles', method: RequestMethod.POST },
       );
   }
 }

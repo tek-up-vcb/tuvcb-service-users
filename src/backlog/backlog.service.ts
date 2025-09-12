@@ -1,102 +1,70 @@
 // src/backlog/backlog.service.ts
-import { Injectable, Logger } from '@nestjs/common';
-import { Pool } from 'pg';
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Backlog } from './backlog.entity';
 
-function poolFromEnv() {
-  if (process.env.DATABASE_URL) {
-    return new Pool({ connectionString: process.env.DATABASE_URL, ssl: false });
-  }
-  return new Pool({
-    host: process.env.PGHOST || 'localhost',
-    port: +(process.env.PGPORT || 5432),
-    user: process.env.PGUSER || 'tuvcb_user',
-    password: process.env.PGPASSWORD || 'tuvcb_password',
-    database: process.env.PGDATABASE || 'tuvcb_main',
-    ssl: false,
-  });
-}
+type CreateBacklogInput = {
+  user_id: number | string | null;
+  action_type: string;
+  action_description: string;
+  metadata: any;
+};
+
+type ListParams = {
+  offset?: number;
+  limit?: number;
+  userId?: number;
+  actionType?: string;
+};
 
 @Injectable()
 export class BacklogService {
-  private readonly logger = new Logger(BacklogService.name);
-  private readonly pool = poolFromEnv();
+  constructor(
+    @InjectRepository(Backlog)
+    private readonly repo: Repository<Backlog>,
+  ) {}
 
-  async insert(params: {
-    user_id: number | null;
-    action_type: string;
-    action_description: string;
-    metadata?: any;
-  }): Promise<void> {
-    const { user_id, action_type, action_description, metadata } = params;
-    const text = `
-      INSERT INTO backlog (user_id, action_type, action_description, metadata)
-      VALUES ($1, $2, $3, $4::jsonb)
-    `;
-    const values = [
-      user_id ?? null,
-      action_type,
-      action_description,
-      metadata ? JSON.stringify(metadata) : null,
-    ];
-    try {
-      await this.pool.query(text, values);
-    } catch (e) {
-      this.logger.error(`Failed to insert backlog: ${e.message}`, e.stack);
-      // On n'empêche pas la requête métier, on log juste l’erreur.
-    }
+  /**
+   * Appelée par le middleware après une requête non-GET réussie.
+   * Ne lève pas d’erreur métier : en cas d’échec, laisse le middleware gérer le catch/log.
+   */
+  async create(input: CreateBacklogInput) {
+    // Cast éventuel pour BigInt en BDD
+    const entity = this.repo.create({
+      user_id:
+        input.user_id === null || input.user_id === undefined
+          ? null
+          : (input.user_id as any),
+      action_type: input.action_type,
+      action_description: input.action_description,
+      metadata: input.metadata ?? null,
+      // created_at est géré par @CreateDateColumn dans l’entity
+    });
+
+    return this.repo.save(entity);
   }
 
-  async findAll(params: {
-    limit?: number;
-    offset?: number;
-    userId?: number;
-    actionType?: string;
-  }) {
-    const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
-    const offset = Math.max(params.offset ?? 0, 0);
+  /**
+   * Utilisée par le controller GET /backlogs
+   */
+  async list(params: ListParams) {
+    const { offset = 0, limit = 50, userId, actionType } = params;
 
-    const where: string[] = [];
-    const values: any[] = [];
-    let i = 1;
+    const qb = this.repo
+      .createQueryBuilder('b')
+      .orderBy('b.created_at', 'DESC')
+      .offset(offset)
+      .limit(limit);
 
-    if (params.userId != null) {
-      where.push(`user_id = $${i++}`);
-      values.push(params.userId);
+    if (userId !== undefined) {
+      qb.andWhere('b.user_id = :userId', { userId });
     }
-    if (params.actionType) {
-      where.push(`action_type = $${i++}`);
-      values.push(params.actionType);
+    if (actionType) {
+      qb.andWhere('b.action_type = :actionType', { actionType });
     }
 
-    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const sql = `
-      SELECT id, user_id, action_type, action_description, metadata, created_at
-      FROM backlog
-      ${whereSql}
-      ORDER BY created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
-    const { rows } = await this.pool.query(sql, values);
-    return rows;
-  }
-
-  async countAll(params: { userId?: number; actionType?: string }) {
-    const where: string[] = [];
-    const values: any[] = [];
-    let i = 1;
-
-    if (params.userId != null) {
-      where.push(`user_id = $${i++}`);
-      values.push(params.userId);
-    }
-    if (params.actionType) {
-      where.push(`action_type = $${i++}`);
-      values.push(params.actionType);
-    }
-
-    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const sql = `SELECT COUNT(*)::int AS count FROM backlog ${whereSql}`;
-    const { rows } = await this.pool.query(sql, values);
-    return rows[0]?.count ?? 0;
+    const [items, total] = await qb.getManyAndCount();
+    return { total, items };
   }
 }

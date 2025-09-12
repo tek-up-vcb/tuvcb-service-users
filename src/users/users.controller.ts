@@ -1,29 +1,27 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  Delete, 
-  Query 
+// imports existants…
+import {
+  Controller, Get, Post, Body, Patch, Param, Delete, Query,
 } from '@nestjs/common';
-import { 
-  ApiTags, 
-  ApiOperation, 
-  ApiResponse, 
-  ApiParam, 
-  ApiQuery 
+import {
+  ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User, UserRole } from './entities/user.entity';
 
+// ⬇️ imports à ajouter
+import { BacklogService } from '../backlog/backlog.service';
+import { ListBacklogsDto } from '../backlog/dto/list-backlogs.dto';
+
 @ApiTags('Users')
 @Controller('api/users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    // ⬇️ injecte BacklogService
+    private readonly backlogService: BacklogService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Créer un nouvel utilisateur' })
@@ -96,5 +94,17 @@ export class UsersController {
   async remove(@Param('id') id: string): Promise<{ message: string }> {
     await this.usersService.remove(id);
     return { message: 'Utilisateur supprimé avec succès' };
+  }
+
+  // ✅ NOUVEL ENDPOINT — GET /api/users/backlogs
+  @Get('backlogs')
+  @ApiOperation({ summary: 'Historique des actions (backlogs)' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Page size', schema: { default: 50 } })
+  @ApiQuery({ name: 'offset', required: false, description: 'Offset', schema: { default: 0 } })
+  @ApiQuery({ name: 'userId', required: false, description: 'Filtrer par user_id' })
+  @ApiQuery({ name: 'actionType', required: false, description: 'Filtrer par type d’action' })
+  @ApiResponse({ status: 200, description: 'Liste paginée des backlogs' })
+  async listBacklogs(@Query() q: ListBacklogsDto) {
+    return this.backlogService.list(q);
   }
 }
